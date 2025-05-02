@@ -1,4 +1,11 @@
-# CIMFlow
+<h1>
+  <img
+    src="https://raw.githubusercontent.com/BUAA-CI-LAB/CIMFlow-Docs/refs/heads/main/public/assets/icon.svg"
+    height="25"
+    alt="CIMFlow logo"
+  >
+  &nbsp;CIMFlow
+</h1>
 
 **Coming Soon — source code and documentation are being prepared for public release.**
 
