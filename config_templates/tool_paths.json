@@ -1,0 +1,9 @@
+{
+  "_comment": "All relative paths in this file are resolved relative to this file's directory",
+  "config_dir": "../modules/CIMFlow-Simulator/config/example",
+  "profiler_cfg": "../modules/CIMFlow-Simulator/config/profiler_config.json",
+  "_profiler_note": "profiler_cfg is OPTIONAL - you can omit this line entirely or use --profile flag when running commands",
+  "compiler_bin": "cim-compiler",
+  "simulator_bin": "cim-simulator",
+  "_bin_note": "Both binaries are in PATH. Install script creates symlink: ~/.local/bin/cim-simulator -> build/cim-simulator"
+}

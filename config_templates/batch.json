@@ -1,0 +1,38 @@
+{
+  "_comment": "All relative paths in this file are resolved relative to this file's directory. Intended default location: config/pipeline.json alongside config/tool_paths.json.",
+  "paths_cfg": "tool_paths.json",
+  "output_dir": "output",
+  "_comment_output_dir": "Shared output directory for all runs in this batch",
+  "keep_ir": false,
+  "_comment_keep_ir": "Set to true to keep all intermediate IR files for debugging (applies to all runs)",
+  "run_name": "batch",
+  "_comment_run_name": "Optional: Name for batch output folder (defaults to 'batch'). Used when keep_ir is false.",
+  "runs": [
+    {
+      "model_path": "path/to/model.onnx",
+      "t": 8,
+      "k": 16,
+      "b": 16,
+      "c": 64,
+      "batch_size": 8,
+      "strategy": "dp",
+      "visualize": false,
+      "log_level": null,
+      "_comment_config": "Optional: override hardware config file path (auto-resolved from T/B by default)",
+      "config_path": null
+    },
+    {
+      "model_path": "path/to/other_model.onnx",
+      "t": 8,
+      "k": 16,
+      "b": 16,
+      "c": 64,
+      "batch_size": 4,
+      "strategy": "dp",
+      "visualize": false,
+      "log_level": "INFO",
+      "_comment_custom_config": "Example: Use a custom config file for this run",
+      "config_path": "path/to/custom_config.json"
+    }
+  ]
+}

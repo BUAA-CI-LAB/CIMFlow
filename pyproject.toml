@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cimflow"
+version = "0.1.0"
+description = "Full-stack compile & simulate framework for digital CIM"
+requires-python = ">=3.11"
+authors = [{name = "Yingjie Qi", email = "yingjieqi@buaa.edu.cn"}]
+license = {text = "Apache-2.0"}
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+]
+urls = {Repository = "https://github.com/BUAA-CI-LAB/CIMFlow", Documentation = "https://cimflow.org/docs", Issues = "https://github.com/BUAA-CI-LAB/CIMFlow/issues"}
+dependencies = [
+  "typer>=0.15,<0.16",
+  "rich",            # nice colours
+  "pydantic>=2",     # config validation
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.scripts]
+cimflow = "cimflow.cli.main:main_with_hints"
+
+[tool.hatch.build]
+exclude = ["modules/**"]

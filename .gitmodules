@@ -1,0 +1,6 @@
+[submodule "modules/CIMFlow-Compiler"]
+	path = modules/CIMFlow-Compiler
+	url = https://github.com/BUAA-CI-LAB/CIMFlow-Compiler.git
+[submodule "modules/CIMFlow-Simulator"]
+	path = modules/CIMFlow-Simulator
+	url = https://github.com/BUAA-CI-LAB/CIMFlow-Simulator.git
