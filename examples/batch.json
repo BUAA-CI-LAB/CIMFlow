@@ -11,7 +11,7 @@
       "k": 16,
       "b": 16,
       "c": 64,
-      "batch_size": 1,
+      "batch_size": 8,
       "strategy": "dp"
     },
     {
@@ -21,7 +21,7 @@
       "k": 16,
       "b": 16,
       "c": 64,
-      "batch_size": 1,
+      "batch_size": 8,
       "strategy": "dp"
     }
   ]

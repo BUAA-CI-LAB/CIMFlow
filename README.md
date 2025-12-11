@@ -31,17 +31,56 @@ CIMFlow consists of two main components:
 
 ## Prerequisites
 
-Before installing, ensure you have the following system dependencies:
+### Python Environment
 
-- **Python**: 3.11+
-- **Build Tools**: `cmake` (>=3.20), `ninja-build`, `make`, `build-essential`
-- **Compiler**: `clang`, `lld`, `ccache`
-- **Java**: `openjdk-11-jdk` (for ANTLR parser)
-- **Libraries**: `libeigen3-dev`, `libunwind-dev`
+- **Python 3.11 or later** is required.
+
+We recommend using Conda for Python environment management:
+
+```bash
+conda create -n cimflow python=3.11
+conda activate cimflow
+```
+
+> **Note:** If you don't have Conda installed, see the [Miniconda installation guide](https://docs.conda.io/en/latest/miniconda.html).
+
+Alternatively, you can use venv:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+```
+
+### System Dependencies
+
+Install the required system packages (Ubuntu/Debian):
+
+```bash
+# Build tools
+sudo apt install build-essential cmake ninja-build ccache
+
+# Clang toolchain (for LLVM/MLIR build)
+sudo apt install clang lld
+
+# Java Development Kit (for ANTLR parser)
+sudo apt install openjdk-11-jdk
+
+# Required libraries
+sudo apt install libeigen3-dev libunwind-dev
+```
 
 ## Installation
 
-To install CIMFlow, its dependencies, and handle submodules, run the installation script:
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/BUAA-CI-LAB/CIMFlow.git
+cd CIMFlow
+```
+
+### 2. Run Installation Script
+
+With your virtual environment activated, run the installation script:
 
 ```bash
 ./install.sh
@@ -52,6 +91,8 @@ This script will:
 2.  Build the compiler (LLVM/MLIR) and simulator (SystemC).
 3.  Install the Python package and CLI tools.
 4.  Generate the default configuration in `config/tool_paths.json`.
+
+> **Tip:** Run `./install.sh --help` for additional options (resume, repair, uninstall, etc.).
 
 ## Configuration
 
