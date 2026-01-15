@@ -1,0 +1,138 @@
+name: Build Tutorial Docker Image
+
+# This workflow runs on the PUBLIC repo (CIMFlow.git), not the private one.
+# It builds Docker images that are fully self-contained - the Dockerfile
+# clones from public repos only, no private access needed.
+
+on:
+  # Manual trigger only - tutorial image is built locally and pushed manually
+  # This avoids wasting CI minutes on long LLVM builds (~45 min)
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: 'Push image to registry'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: buaa-ci-lab/cimflow-tutorial
+
+# Prevent concurrent builds of the same branch/tag
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: Build Tutorial Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90  # LLVM build can take 30+ minutes
+
+    # Manual dispatch only - build locally for testing, use CI for convenience if needed
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # Note: No submodules needed - Dockerfile.tutorial clones from GitHub directly
+
+      - name: Verify public repo configuration
+        # Skip in private repo (manual dispatch for testing)
+        if: github.repository == 'BUAA-CI-LAB/CIMFlow'
+        run: |
+          echo "Checking .gitmodules for private repo references..."
+          if grep -q "Private" .gitmodules 2>/dev/null; then
+            echo "::error::ERROR: .gitmodules contains 'Private' references!"
+            echo "This workflow should only run on the release branch with public submodules."
+            echo ""
+            echo "Current .gitmodules:"
+            cat .gitmodules
+            exit 1
+          fi
+          echo "OK: Using public submodules"
+          cat .gitmodules
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+
+      - name: Build and push tutorial image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.tutorial
+          push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Image digest
+        run: echo ${{ steps.build.outputs.digest }}
+
+  build-dev-base:
+    name: Build Dev Base Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Base image is much faster (no LLVM build)
+
+    # Manual dispatch only - build locally for testing, use CI for convenience if needed
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push dev-base image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.dev-base
+          push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false') }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-base
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-base-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64

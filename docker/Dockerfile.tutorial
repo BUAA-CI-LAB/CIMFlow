@@ -1,0 +1,201 @@
+# CIMFlow Tutorial Docker Image
+# Multi-stage build for ASP-DAC hands-on tutorial
+#
+# Build: docker build -f docker/Dockerfile.tutorial -t cimflow-tutorial .
+# Run:   docker run -it --rm -v $(pwd)/output:/app/output cimflow-tutorial
+
+# =============================================================================
+# Stage 1: Base image with system dependencies
+# =============================================================================
+FROM ubuntu:22.04 AS base
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    # Build essentials
+    build-essential \
+    cmake \
+    ninja-build \
+    ccache \
+    # Version control
+    git \
+    # Download tools
+    curl \
+    wget \
+    # Archive tools
+    zip \
+    unzip \
+    # Compilers and toolchains
+    clang-12 \
+    lld-12 \
+    llvm-12 \
+    # Java (for ANTLR grammar compilation)
+    openjdk-17-jdk \
+    # Libraries
+    libboost-all-dev \
+    libgflags-dev \
+    libunwind-dev \
+    # Python
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
+    # Utilities
+    tree \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Trust all git directories (needed for submodule operations in Docker)
+RUN git config --global --add safe.directory '*'
+
+# Add LLVM to PATH
+ENV PATH="/usr/lib/llvm-12/bin:${PATH}"
+
+# Install PyTorch FIRST (CPU-only for smaller image)
+# This must come before sympy to avoid version conflict:
+# - torch requires sympy>=1.13.3
+# - cim-compiler requires sympy==1.11.1
+# Installing torch first, then pinning sympy ensures correct final version
+RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install Python packages for CIM Compiler
+# Note: sympy is pinned AFTER torch to override torch's requirement
+RUN pip3 install --no-cache-dir \
+    # Core dependencies
+    numpy \
+    pandas \
+    pyyaml \
+    # ONNX processing
+    onnx \
+    onnxoptimizer \
+    # Compiler-specific (sympy pinned to override torch's requirement)
+    bitarray==3.3.1 \
+    islpy==2023.2.5 \
+    sympy==1.11.1 \
+    # Utilities
+    jinja2 \
+    tqdm \
+    networkx \
+    matplotlib \
+    # Visualization (optional but useful for demos)
+    plotly \
+    streamlit \
+    # Testing
+    pytest \
+    pytest-xdist \
+    ipdb
+
+# Install CIMFlow CLI dependencies
+RUN pip3 install --no-cache-dir \
+    "typer>=0.15,<0.16" \
+    rich \
+    "pydantic>=2"
+
+# Install build tools (for pip install -e . with --no-build-isolation)
+RUN pip3 install --no-cache-dir \
+    hatchling \
+    editables \
+    packaging \
+    pathspec \
+    pluggy
+
+WORKDIR /app
+
+# =============================================================================
+# Stage 2: Builder - build from checked-out code
+# =============================================================================
+FROM base AS builder
+
+WORKDIR /app/cimflow
+
+# Copy repo from build context (whatever branch the workflow checked out)
+# This allows testing release-public before syncing to public repo
+COPY . .
+
+# Verify we have public submodules (safety check)
+# The tutorial image must use public submodule URLs so end users can clone them
+RUN echo "Verifying submodule configuration..." && \
+    if grep -q "Private" .gitmodules 2>/dev/null; then \
+        echo "" && \
+        echo "========================================" && \
+        echo "ERROR: Cannot build tutorial image" && \
+        echo "========================================" && \
+        echo "" && \
+        echo "Found private submodule references in .gitmodules." && \
+        echo "The tutorial image requires public submodules." && \
+        echo "" && \
+        echo "To fix, build from one of these branches:" && \
+        echo "  - release-public (private repo, has public submodules)" && \
+        echo "  - main (public repo)" && \
+        echo "" && \
+        exit 1; \
+    fi && \
+    echo "OK: Using public submodules"
+
+# Run the unified install script
+# --shallow: Use shallow clones for faster builds and smaller image
+# This handles: submodule init, nested submodules, LLVM build, compiler build,
+# simulator build, Python packages, and config setup
+RUN ./install.sh --shallow
+
+# =============================================================================
+# Stage 3: Runtime - minimal image with only necessary files
+# =============================================================================
+FROM base AS runtime
+
+# Copy CIMFlow source and installed packages
+COPY --from=builder /app/cimflow /app/cimflow
+
+# Copy Python site-packages (includes cim-compiler and cimflow)
+COPY --from=builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
+
+# Copy built binaries to /usr/local/bin for PATH access
+# Simulator binary (C++)
+COPY --from=builder /app/cimflow/modules/CIMFlow-Simulator/build/cim-simulator /usr/local/bin/cim-simulator
+
+# Copy Python console scripts (created by pip install -e .)
+# These are needed for cimflow and cim-compiler CLI commands
+COPY --from=builder /usr/local/bin/cimflow /usr/local/bin/cimflow
+COPY --from=builder /usr/local/bin/cim-compiler /usr/local/bin/cim-compiler
+
+# Copy hardware configuration files
+COPY --from=builder /app/cimflow/modules/CIMFlow-Simulator/config /app/cimflow/modules/CIMFlow-Simulator/config
+
+# Set up working directory and paths
+WORKDIR /app/cimflow
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Create directories for runtime
+RUN mkdir -p /app/cimflow/data/models /app/output
+
+# Download example models (included in image for offline use)
+RUN ./scripts/download_models.sh
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Copy tutorial materials
+COPY tutorial /app/cimflow/tutorial
+
+# Set entrypoint (shows help on interactive start)
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Default command: interactive shell
+CMD ["/bin/bash"]
+
+# =============================================================================
+# Labels
+# =============================================================================
+LABEL org.opencontainers.image.title="CIMFlow Tutorial"
+LABEL org.opencontainers.image.description="CIMFlow compilation and simulation framework for CIM architectures"
+LABEL org.opencontainers.image.source="https://github.com/BUAA-CI-LAB/CIMFlow"
+LABEL org.opencontainers.image.documentation="https://github.com/BUAA-CI-LAB/CIMFlow"
+LABEL org.opencontainers.image.vendor="BUAA-CI-LAB"

@@ -1,0 +1,53 @@
+{
+  "_comment": "Design Space Exploration: Bandwidth x Batch Size",
+  "_note": "Paths are relative to this JSON file's directory",
+  "output_dir": "../output/demo3_exploration",
+  "keep_ir": false,
+  "run_name": "design_exploration",
+  "runs": [
+    {
+      "_name": "B8_batch1",
+      "_comment": "Low bandwidth, single batch",
+      "model_path": "../data/models/resnet18.onnx",
+      "t": 8,
+      "k": 16,
+      "b": 8,
+      "c": 64,
+      "batch_size": 1,
+      "strategy": "dp"
+    },
+    {
+      "_name": "B8_batch8",
+      "_comment": "Low bandwidth, large batch",
+      "model_path": "../data/models/resnet18.onnx",
+      "t": 8,
+      "k": 16,
+      "b": 8,
+      "c": 64,
+      "batch_size": 8,
+      "strategy": "dp"
+    },
+    {
+      "_name": "B16_batch1",
+      "_comment": "High bandwidth, single batch",
+      "model_path": "../data/models/resnet18.onnx",
+      "t": 8,
+      "k": 16,
+      "b": 16,
+      "c": 64,
+      "batch_size": 1,
+      "strategy": "dp"
+    },
+    {
+      "_name": "B16_batch8",
+      "_comment": "High bandwidth, large batch",
+      "model_path": "../data/models/resnet18.onnx",
+      "t": 8,
+      "k": 16,
+      "b": 16,
+      "c": 64,
+      "batch_size": 8,
+      "strategy": "dp"
+    }
+  ]
+}

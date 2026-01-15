@@ -29,10 +29,31 @@ CIMFlow consists of two main components:
 1.  **CIMFlow Compiler**: Transforms high-level neural network models (ONNX) into optimized instruction sequences (ISA) for the target CIM architecture.
 2.  **CIMFlow Simulator**: Executes the generated instructions on a cycle-accurate model of the hardware, producing detailed performance and energy reports.
 
+## Docker
+
+CIMFlow provides Docker images for both tutorials and development:
+
+| Image | Purpose | Download |
+|-------|---------|----------|
+| `cimflow-tutorial:latest` | Pre-built with models and demos | ~3GB |
+| `cimflow-tutorial:dev-base` | Development base with dependencies | ~1GB |
+
+```bash
+# Try the interactive tutorial
+docker run -it --rm ghcr.io/buaa-ci-lab/cimflow-tutorial:latest
+
+# Or start a development environment
+./docker/dev.sh
+```
+
+See [docker/README.md](docker/README.md) for detailed instructions.
+
 ## Prerequisites
 
-### Python Environment
+### System Requirements
 
+- **Operating System**: Ubuntu 22.04 (other Linux distributions may work but are untested)
+- **Disk Space**: 15GB or more available
 - **Python 3.11 or later** is required.
 
 We recommend using Conda for Python environment management:
@@ -53,7 +74,7 @@ source .venv/bin/activate
 
 ### System Dependencies
 
-Install the required system packages (Ubuntu/Debian):
+Install the required system packages (Ubuntu 22.04):
 
 ```bash
 # Build tools
@@ -133,6 +154,30 @@ cimflow run pipeline -m model.onnx -o output -l VERBOSE
 
 - **Default**: Simulation reports are saved in the output directory.
 - **Debug (`--keep-ir`)**: Saves all intermediate files (IR, ISA, logs) in timestamped folders.
+
+## Tutorial
+
+CIMFlow includes interactive tutorials to help you get started. Run them in Docker or after local installation:
+
+```bash
+# Demo 0: Setup verification
+./tutorial/demo0_setup.sh
+
+# Demo 1: Quick end-to-end pipeline
+./tutorial/demo1_quickstart.sh
+
+# Demo 2: Step-by-step compilation stages
+./tutorial/demo2_stages.sh
+
+# Demo 3: Design space exploration
+./tutorial/demo3_exploration.sh
+```
+
+The tutorials cover:
+- **Demo 0**: Verify installation and explore CLI commands
+- **Demo 1**: Run a complete compile-simulate pipeline on ResNet-18
+- **Demo 2**: Understand each compilation stage (CG, OP, Simulation)
+- **Demo 3**: Batch processing for hardware design exploration
 
 ## Contributing
 

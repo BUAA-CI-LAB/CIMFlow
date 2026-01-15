@@ -18,6 +18,7 @@ NC='\033[0m' # No Color
 SHALLOW_CLONE=false
 REPAIR_MODE=false
 RESUME_MODE=false
+DEV_MODE=false
 MAX_RETRIES=3
 RETRY_DELAY=5
 PROGRESS_FILE="${SCRIPT_DIR}/.install_progress"
@@ -25,6 +26,17 @@ PROGRESS_FILE="${SCRIPT_DIR}/.install_progress"
 # Track installation status
 INSTALL_ERRORS=0
 CRITICAL_ERRORS=0
+
+# Helper: get pip install args (use --no-build-isolation only if build tools are pre-installed)
+# This allows Docker builds (with pre-installed hatchling) to skip re-downloading,
+# while fresh venv installs will use normal isolation and auto-install build deps
+get_pip_install_args() {
+    if python3 -c "import hatchling" 2>/dev/null; then
+        echo "--no-build-isolation"
+    else
+        echo ""
+    fi
+}
 
 # Parse command line arguments
 show_help() {
@@ -34,6 +46,7 @@ show_help() {
     echo "  --shallow     Use shallow clones for submodules (faster, less disk space)"
     echo "  --repair      Fix broken/dirty submodules (discards local changes)"
     echo "  --resume      Resume from last completed step"
+    echo "  --dev         Development mode: preserve submodule branches (don't reset to recorded commit)"
     echo "  --clean       Remove progress file and start fresh"
     echo "  --uninstall   Remove installed packages and build artifacts"
     echo "  --uninstall --force  Also remove submodule source code"
@@ -44,6 +57,7 @@ show_help() {
     echo "  ./install.sh --shallow          # Fast install with shallow clones"
     echo "  ./install.sh --resume           # Continue after interruption"
     echo "  ./install.sh --resume --repair  # Resume and fix broken submodules"
+    echo "  ./install.sh --dev              # Install without resetting submodule branches"
     echo "  ./install.sh --clean --shallow  # Fresh shallow install"
     echo "  ./install.sh --uninstall        # Remove installation"
 }
@@ -60,6 +74,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --resume)
             RESUME_MODE=true
+            shift
+            ;;
+        --dev)
+            DEV_MODE=true
             shift
             ;;
         --clean)
@@ -299,6 +317,18 @@ init_submodule_robust() {
         return 0
     fi
 
+    # In dev mode, treat "wrong-commit" and "dirty" as acceptable
+    # (developer is working on a different branch or has local changes)
+    if [ "$DEV_MODE" = true ]; then
+        if [ "$health" = "wrong-commit" ]; then
+            echo -e "${GREEN}✓ $name is initialized (dev mode: preserving current branch)${NC}"
+            return 0
+        elif [ "$health" = "dirty" ]; then
+            echo -e "${GREEN}✓ $name is initialized (dev mode: preserving local changes)${NC}"
+            return 0
+        fi
+    fi
+
     # Auto-repair broken submodules only in repair mode
     if [ "$health" != "missing" ]; then
         if [ "$REPAIR_MODE" = true ]; then
@@ -378,7 +408,13 @@ elif [ "$RESUME_MODE" = true ] || [ "$REPAIR_MODE" = true ]; then
     for submodule_dir in modules/*/; do
         if [ -f "${submodule_dir}.gitmodules" ]; then
             # Check if any nested submodule is uninitialized or at wrong commit
-            if (cd "$submodule_dir" && git submodule status --recursive 2>/dev/null | grep -qE '^[-+]'); then
+            # In dev mode, only check for uninitialized (-), not wrong commit (+)
+            if [ "$DEV_MODE" = true ]; then
+                _grep_pattern='^-'
+            else
+                _grep_pattern='^[-+]'
+            fi
+            if (cd "$submodule_dir" && git submodule status --recursive 2>/dev/null | grep -qE "$_grep_pattern"); then
                 echo -e "${YELLOW}⚠ Found incomplete nested submodules, will re-run initialization${NC}"
                 run_nested_init=true
                 break
@@ -472,6 +508,14 @@ if [ "$run_nested_init" = true ]; then
                 while IFS= read -r nested_path; do
                     nested_name="$(basename "$nested_path")"
                     nested_full="${submodule_dir}${nested_path}"
+
+                    # In dev mode, skip if submodule is already initialized (even if at different commit)
+                    if [ "$DEV_MODE" = true ] && [ -d "$nested_full" ] && [ -e "$nested_full/.git" ]; then
+                        if (cd "$nested_full" && git rev-parse HEAD >/dev/null 2>&1); then
+                            echo -e "${GREEN}✓ $nested_name is initialized (dev mode: preserving current state)${NC}"
+                            continue
+                        fi
+                    fi
 
                     # Build command arguments array
                     _git_args=(submodule update --init --recursive --progress)
@@ -590,7 +634,9 @@ if ! is_step_complete "submodules_build"; then
                 fi
             elif [ -f "${submodule_dir}setup.py" ] || [ -f "${submodule_dir}pyproject.toml" ]; then
                 echo -e "${CYAN}  Running pip install...${NC}"
-                if (cd "$submodule_dir" && pip install -v -e .); then
+                # Use --no-build-isolation only if build tools are pre-installed (e.g., Docker)
+                local pip_args=$(get_pip_install_args)
+                if (cd "$submodule_dir" && pip install -v $pip_args -e .); then
                     installed=true
                 else
                     echo -e "${RED}  Failed to install $submodule_name via pip${NC}"
@@ -625,7 +671,9 @@ if ! is_step_complete "cimflow_install"; then
     echo -e "${CYAN}Step 4/4: Installing cimflow...${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
 
-    if ! pip install -v -e .; then
+    # Use --no-build-isolation only if build tools are pre-installed (e.g., Docker)
+    pip_args=$(get_pip_install_args)
+    if ! pip install -v $pip_args -e .; then
         echo -e "${RED}ERROR: Failed to install cimflow${NC}"
         ((CRITICAL_ERRORS++))
     else

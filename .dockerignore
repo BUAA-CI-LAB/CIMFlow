@@ -1,0 +1,52 @@
+# Git - keep root .git and .gitmodules for submodule commands
+# Exclude submodule contents (cloned fresh by git submodule update in Dockerfile)
+modules/
+
+**/.gitignore
+
+# Build artifacts
+**/build
+**/dist
+**/*.egg-info
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*.so
+
+# Virtual environments
+**/.env
+**/.venv
+**/env
+**/venv
+
+# IDE
+**/.vscode
+**/.idea
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Logs
+**/*.log
+
+# User configuration and generated outputs
+config/
+output/
+data/
+
+# Installation progress
+.install_progress
+
+# Claude Code guidance (internal)
+CLAUDE.md
+
+# Large submodule build artifacts
+**/thirdparty/llvm-project/build
+**/thirdparty/llvm-project/.git
+
+# Test outputs
+**/.pytest_cache
+**/htmlcov
+**/.coverage

@@ -1,0 +1,115 @@
+# CIMFlow Development Base Image
+# Contains all system dependencies - users build from source
+#
+# Build: docker build -f docker/Dockerfile.dev-base -t cimflow-dev-base .
+# Run:   docker run -it --rm -v $(pwd):/app/cimflow cimflow-dev-base
+#        cd /app/cimflow && ./install.sh --shallow
+
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    # Build essentials
+    build-essential \
+    cmake \
+    ninja-build \
+    ccache \
+    # Version control
+    git \
+    # Download tools
+    curl \
+    wget \
+    # Archive tools
+    zip \
+    unzip \
+    # Compilers and toolchains
+    clang-12 \
+    lld-12 \
+    llvm-12 \
+    # Java (for ANTLR grammar compilation)
+    openjdk-17-jdk \
+    # Libraries
+    libboost-all-dev \
+    libgflags-dev \
+    libunwind-dev \
+    # Python
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
+    # Utilities
+    tree \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Add LLVM to PATH
+ENV PATH="/usr/lib/llvm-12/bin:${PATH}"
+
+# Install PyTorch FIRST (CPU-only for smaller image)
+# This must come before sympy to avoid version conflict:
+# - torch requires sympy>=1.13.3
+# - cim-compiler requires sympy==1.11.1
+# Installing torch first, then pinning sympy ensures correct final version
+RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install Python packages for CIM Compiler
+# Note: sympy is pinned AFTER torch to override torch's requirement
+RUN pip3 install --no-cache-dir \
+    # Core dependencies
+    numpy \
+    pandas \
+    pyyaml \
+    # ONNX processing
+    onnx \
+    onnxoptimizer \
+    # Compiler-specific (sympy pinned to override torch's requirement)
+    bitarray==3.3.1 \
+    islpy==2023.2.5 \
+    sympy==1.11.1 \
+    # Utilities
+    jinja2 \
+    tqdm \
+    networkx \
+    matplotlib \
+    # Visualization
+    plotly \
+    streamlit \
+    # Testing
+    pytest \
+    pytest-xdist \
+    ipdb
+
+# Install CIMFlow CLI dependencies
+RUN pip3 install --no-cache-dir \
+    "typer>=0.15,<0.16" \
+    rich \
+    "pydantic>=2"
+
+# Install build tools (for pip install -e . with --no-build-isolation)
+RUN pip3 install --no-cache-dir \
+    hatchling \
+    editables \
+    packaging \
+    pathspec \
+    pluggy
+
+# Trust all git directories (needed for mounted volumes with different ownership)
+RUN git config --global --add safe.directory '*'
+
+WORKDIR /app/cimflow
+
+# Default command
+CMD ["/bin/bash"]
+
+# Labels
+LABEL org.opencontainers.image.title="CIMFlow Development Base"
+LABEL org.opencontainers.image.description="Base image with dependencies for building CIMFlow from source"
+LABEL org.opencontainers.image.source="https://github.com/BUAA-CI-LAB/CIMFlow"
